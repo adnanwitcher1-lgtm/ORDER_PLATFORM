@@ -1,0 +1,12 @@
+Django>=5.2,<5.3
+python-decouple>=3.8
+cryptography>=42
+requests>=2.31
+reportlab>=4.0        # PDF exports and client reports
+pyotp>=2.9            # two-factor authentication (authenticator app)
+qrcode>=7.4           # QR code for the 2FA setup page
+celery>=5.3           # optional: only if you run checks with Celery
+redis>=5.0            # optional: only if you run checks with Celery
+gunicorn>=22.0        # production web server
+whitenoise>=6.6       # serves static files in production
+psycopg[binary]>=3.1  # PostgreSQL driver (production)

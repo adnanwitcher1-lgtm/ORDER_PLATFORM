@@ -1,0 +1,54 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login | Order Platform</title>
+    <script>
+        (function () {
+            var theme = "light";
+            try {
+                var saved = localStorage.getItem("theme");
+                if (saved === "dark" || saved === "light") { theme = saved; }
+                else if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) { theme = "dark"; }
+            } catch (e) {}
+            document.documentElement.setAttribute("data-theme", theme);
+        })();
+    </script>
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+<body class="login-body">
+    <button type="button" class="theme-toggle floating" id="themeToggle" aria-label="Switch between light and dark theme" title="Switch theme">
+                    <span class="icon-moon">&#127769;</span><span class="icon-sun">&#9728;&#65039;</span>
+                </button>
+    <div class="login-card">
+        <div class="login-brand">
+            <span class="brand-icon big">OP</span>
+            <h2>Order Platform</h2>
+            <p>Sign in to your staff account</p>
+        </div>
+        {% if locked %}
+            <div class="alert alert-error">Too many failed attempts. Please try again after 15 minutes.</div>
+        {% endif %}
+        {% if form.errors %}
+            <div class="alert alert-error">Incorrect username or password.</div>
+        {% endif %}
+
+        <form method="post" novalidate>
+            {% csrf_token %}
+            <div class="form-group">
+                <label for="{{ form.username.id_for_label }}">Username</label>
+                {{ form.username }}
+            </div>
+            <div class="form-group">
+                <label for="{{ form.password.id_for_label }}">Password</label>
+                {{ form.password }}
+            </div>
+            <input type="hidden" name="next" value="{{ next }}">
+            <button type="submit" class="btn btn-primary btn-block">Sign In</button>
+        </form>
+    </div>
+    <script src="{% static 'js/app.js' %}"></script>
+</body>
+</html>

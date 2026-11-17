@@ -1,0 +1,276 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}{{ order.order_number }}{% endblock %}
+{% block page_title %}Order Detail{% endblock %}
+
+{% block content %}
+{% if duplicates %}
+<div class="alert alert-warning">
+    <strong>Duplicate warning:</strong> this channel has other open orders:
+    {% for d in duplicates %}
+        <a href="{% url 'orders:detail' d.pk %}" class="link"><strong>{{ d.order_number }}</strong></a> ({{ d.get_status_display }}){% if not forloop.last %}, {% endif %}
+    {% endfor %}
+</div>
+{% endif %}
+
+{% if order.status == "target_observed" %}
+<div class="alert alert-info">
+    The target has been observed. Verify the source and then <strong>Complete</strong> the order, or record <strong>Reopen</strong> / <strong>Exception</strong>.
+</div>
+{% endif %}
+
+<div class="card section-gap">
+    <div class="card-header header-row">
+        <div>
+            <h3>{{ order.order_number }} &middot; {{ order.customer.name }}</h3>
+            <small class="muted">{{ order.channel.name }} &middot;
+                <a href="{{ order.channel.url }}" target="_blank" rel="noopener noreferrer" class="link">{{ order.channel.url }}</a></small>
+        </div>
+        <div>
+            <span class="badge badge-{{ order.status }}">{{ order.get_status_display }}</span>
+            <span class="badge badge-prio-{{ order.priority }}">{{ order.get_priority_display }}</span>
+        </div>
+    </div>
+</div>
+
+{% if transitions %}
+<div class="card section-gap">
+    <div class="card-header"><h3>Actions</h3></div>
+    <div class="card-body">
+        <div class="action-row">
+            {% for t in transitions %}
+                {% if t.needs_reason or t.ask_note %}
+                <details class="action-box">
+                    <summary class="btn btn-{{ t.style }}">{{ t.label }}</summary>
+                    <form method="post" action="{% url 'orders:action' order.pk t.key %}" class="action-form">
+                        {% csrf_token %}
+                        <label>
+                            {% if t.needs_reason %}Reason <span class="req">*</span>{% else %}Review note (optional){% endif %}
+                        </label>
+                        <textarea name="reason" rows="2" class="input" {% if t.needs_reason %}required{% endif %}></textarea>
+                        <button type="submit" class="btn btn-{{ t.style }} btn-sm">Confirm: {{ t.label }}</button>
+                    </form>
+                </details>
+                {% else %}
+                <form method="post" action="{% url 'orders:action' order.pk t.key %}"
+                      onsubmit="return confirm('{{ t.label }}?');">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-{{ t.style }}">{{ t.label }}</button>
+                </form>
+                {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div class="stats-grid">
+    <div class="stat-card stat-blue">
+        <span class="stat-label">Baseline</span>
+        <span class="stat-value">{{ order.baseline_count }}</span>
+        <small class="muted">{{ order.baseline_recorded_at|date:"d M Y, h:i A" }}</small>
+    </div>
+    <div class="stat-card stat-green">
+        <span class="stat-label">Target</span>
+        <span class="stat-value">{{ order.target_count }}</span>
+        <small class="muted">+{{ order.requested_increase }} requested</small>
+    </div>
+    <div class="stat-card stat-amber">
+        <span class="stat-label">Latest Observed</span>
+        <span class="stat-value">{% if p.has_observation %}{{ order.latest_observed_count }}{% else %}N/A{% endif %}</span>
+        <small class="muted">
+            {% if p.has_observation %}{{ order.latest_observed_at|date:"d M Y, h:i A"|default:"-" }}{% else %}No check yet{% endif %}
+        </small>
+        {% if p.has_observation and order.latest_observed_accuracy %}
+            <span class="badge badge-{{ order.latest_observed_accuracy }}">{{ order.latest_observed_accuracy|title }}</span>
+        {% endif %}
+    </div>
+    <div class="stat-card stat-red">
+        <span class="stat-label">Remaining Gap</span>
+        <span class="stat-value">{% if p.has_observation %}{{ p.remaining_gap }}{% else %}-{% endif %}</span>
+        <small class="muted">
+            {% if p.has_observation %}Observed change: {{ p.observed_increase|stringformat:"+d" }}{% endif %}
+        </small>
+    </div>
+</div>
+
+<div class="card section-gap">
+    <div class="card-header"><h3>Progress</h3></div>
+    <div class="card-body">
+        <div class="progress">
+            <div class="progress-bar {% if p.target_reached %}done{% endif %}" style="width: {{ p.progress_percent }}%"></div>
+        </div>
+        <p class="progress-text">
+            {% if p.has_observation %}<strong>{{ p.progress_percent }}%</strong>{% else %}<strong>No data</strong>{% endif %}
+            {% if p.target_reached %}
+                &mdash; Target observed. Review required.
+            {% elif not p.has_observation %}
+                &mdash; Metric unavailable or not checked yet.
+            {% endif %}
+        </p>
+        {% if p.below_baseline %}
+            <div class="alert alert-warning">The latest count is below the baseline ({{ p.observed_increase }}). Progress is shown as 0%.</div>
+        {% endif %}
+        <small class="muted">
+            This only records the observed count. It is not proof that any software increased the count.
+        </small>
+    </div>
+</div>
+
+<div class="card section-gap">
+    <div class="card-header"><h3>Order Information</h3></div>
+    <div class="card-body">
+        <dl class="info-list">
+            <dt>Customer</dt><dd><a href="{% url 'customers:detail' order.customer.pk %}" class="link">{{ order.customer.name }}</a></dd>
+            <dt>Assigned to</dt><dd>{{ order.assigned_to.display_name|default:"Not assigned" }}</dd>
+            <dt>Created by</dt><dd>{{ order.created_by.display_name|default:"-" }}</dd>
+            <dt>Created on</dt><dd>{{ order.created_at|date:"d M Y, h:i A" }}</dd>
+            <dt>Approved on</dt><dd>{{ order.approved_at|date:"d M Y, h:i A"|default:"-" }}</dd>
+            <dt>Reviewed by</dt>
+            <dd>{% if order.reviewed_by %}{{ order.reviewed_by.display_name }} ({{ order.reviewed_at|date:"d M Y, h:i A" }}){% else %}-{% endif %}</dd>
+            <dt>Closed on</dt><dd>{{ order.closed_at|date:"d M Y, h:i A"|default:"-" }}</dd>
+                        <dt>Next auto-check</dt>
+            <dd>{% if order.status == "monitoring" or order.status == "assigned" %}{{ order.next_check_at|date:"d M Y, h:i A"|default:"On the next run" }}{% else %}Stopped{% endif %}</dd>
+            <dt>Check failures</dt><dd>{{ order.check_failures }}</dd>
+            <dt>Notes</dt><dd>{{ order.notes|default:"-"|linebreaksbr }}</dd>
+        </dl>
+        <div class="form-actions">
+            <a href="{% url 'orders:list' %}" class="btn btn-light">Back</a>
+            {% if can_edit and is_editable %}
+                <a href="{% url 'orders:update' order.pk %}" class="btn btn-primary">Edit</a>
+            {% elif can_edit %}
+                <span class="muted">An approved order is locked.</span>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="card section-gap">
+    <div class="card-header header-row">
+        <h3>Assignment</h3>
+        <span class="muted">Current: <strong>{{ order.assigned_to.display_name|default:"Not assigned" }}</strong></span>
+    </div>
+    <div class="card-body">
+        {% if can_assign %}
+        <form method="post" action="{% url 'orders:assign' order.pk %}" class="assign-form">
+            {% csrf_token %}
+            <div class="form-group">{{ assign_form.assignee }}</div>
+            <div class="form-group">{{ assign_form.reason }}</div>
+            <button type="submit" class="btn btn-primary btn-sm">
+                {% if order.assigned_to %}Reassign{% else %}Assign{% endif %}
+            </button>
+        </form>
+        {% endif %}
+
+        <h4 class="subhead">Assignment History</h4>
+        <div class="table-wrap">
+            <table class="table">
+                <thead><tr><th>When</th><th>Assigned to</th><th>Changed by</th><th>Reason</th></tr></thead>
+                <tbody>
+                    {% for a in assignments %}
+                    <tr>
+                        <td>{{ a.changed_at|date:"d M Y, h:i A" }}</td>
+                        <td><strong>{{ a.assigned_to.display_name|default:"-" }}</strong></td>
+                        <td>{{ a.changed_by.display_name|default:"-" }}</td>
+                        <td>{{ a.reason|default:"-" }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="4" class="empty-state">Not assigned yet.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="card section-gap chart-card">
+    <div class="card-header header-row">
+        <h3>Growth &amp; Estimate</h3>
+        <button type="button" class="btn btn-light btn-sm ai-summary-btn" data-scope="order" data-id="{{ order.pk }}">AI summary</button>
+    </div>
+    <div class="card-body">
+        <p class="eta-line eta-{{ eta.state }}">{{ eta.message }}</p>
+        <div class="ai-summary-box" hidden></div>
+        <div class="chart-box"><canvas id="chartGrowth" role="img" aria-label="Line chart of observed count over time against the target"></canvas></div>
+        <small class="muted">The estimate is based on the observed trend only. It is not a guarantee.</small>
+    </div>
+</div>
+
+{{ chart_data|json_script:"order-chart-data" }}
+
+<div class="card section-gap">
+    <div class="card-header header-row">
+        <h3>Observation History</h3>
+        {% if can_fetch %}
+        <form method="post" action="{% url 'orders:observation_fetch' order.pk %}">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-primary btn-sm">Check YouTube Now</button>
+        </form>
+        {% endif %}
+    </div>
+    <div class="card-body">
+        {% if can_record %}
+        <form method="post" action="{% url 'orders:observation_create' order.pk %}" class="obs-form">
+            {% csrf_token %}
+            <div class="form-group"><label>Count type</label>{{ observation_form.accuracy }}</div>
+            <div class="form-group"><label>Observed count</label>{{ observation_form.observed_count }}</div>
+            <div class="form-group obs-note"><label>Source / note</label>{{ observation_form.note }}</div>
+            <button type="submit" class="btn btn-success btn-sm">Record Observation</button>
+        </form>
+        {% endif %}
+        {% if order.latest_observed_accuracy == "approximate" %}
+            <small class="muted">The latest count is approximate (the YouTube public count is rounded). Verify the source before completing.</small>
+        {% endif %}
+    </div>
+    <div class="table-wrap">
+        <table class="table">
+            <thead><tr><th>When</th><th>Count</th><th>Type</th><th>Source</th><th>By</th><th>Note / Status</th></tr></thead>
+            <tbody>
+                {% for ob in observations %}
+                <tr>
+                    <td>{{ ob.observed_at|date:"d M Y, h:i A" }}</td>
+                    <td><strong>{{ ob.observed_count|default_if_none:"N/A" }}</strong></td>
+                    <td><span class="badge badge-{{ ob.accuracy }}">{{ ob.get_accuracy_display }}</span></td>
+                    <td>{{ ob.get_source_display }}</td>
+                    <td>{{ ob.recorded_by.display_name|default:"System" }}</td>
+                    <td>{{ ob.note|default:ob.api_status|default:"-" }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="6" class="empty-state">No observations yet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header"><h3>Activity Log</h3></div>
+    <div class="table-wrap">
+        <table class="table">
+            <thead><tr><th>When</th><th>Action</th><th>Status</th><th>By</th><th>Note</th></tr></thead>
+            <tbody>
+                {% for e in events %}
+                <tr>
+                    <td>{{ e.created_at|date:"d M Y, h:i A" }}</td>
+                    <td><strong>{{ e.action }}</strong></td>
+                    <td>
+                        {% if e.from_label and e.from_label != e.to_label %}{{ e.from_label }} &rarr; {{ e.to_label }}
+                        {% elif e.to_label %}{{ e.to_label }}{% else %}-{% endif %}
+                    </td>
+                    <td>{{ e.actor.display_name|default:"-" }}</td>
+                    <td>{{ e.note|default:"-" }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="5" class="empty-state">No activity yet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/vendor/chart.umd.js' %}"></script>
+<script src="{% static 'js/order_chart.js' %}"></script>
+<script src="{% static 'js/ai.js' %}"></script>
+{% endblock %}

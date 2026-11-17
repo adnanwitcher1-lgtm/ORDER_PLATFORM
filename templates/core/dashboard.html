@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="welcome header-row">
+    <div>
+        <h2>Welcome back, {{ user.display_name }}</h2>
+        <p>Manage your orders, customers and reports from here.</p>
+    </div>
+    {% if user.is_superuser or user.role == "manager" or user.role == "sales" %}
+    <div class="quick-actions">
+        <a href="{% url 'orders:create' %}" class="btn btn-success">+ New Order</a>
+        <a href="{% url 'customers:create' %}" class="btn btn-primary">+ Add Customer</a>
+        <a href="{% url 'channels:create' %}" class="btn btn-light">+ Add Channel</a>
+    </div>
+    {% endif %}
+</div>
+
+{% if awaiting_review %}
+<div class="alert alert-warning">
+    <strong>{{ awaiting_review }}</strong> order{{ awaiting_review|pluralize }} {{ awaiting_review|pluralize:"has,have" }} reached the observed target and {{ awaiting_review|pluralize:"is,are" }} waiting for review.
+    <a href="{% url 'orders:list' %}?status=target_observed" class="link"><strong>Review now</strong></a>
+</div>
+{% endif %}
+
+{% if show_google and reauth_count %}
+<div class="alert alert-warning">
+    <strong>{{ reauth_count }}</strong> Google account{{ reauth_count|pluralize }} {{ reauth_count|pluralize:'needs,need' }} reauthorization.
+    <a href="{% url 'google:list' %}?status=needs_reauth" class="link"><strong>View</strong></a>
+</div>
+{% endif %}
+
+<div class="stats-grid">
+    {% for stat in stats %}
+    <a href="{{ stat.url }}" class="stat-card stat-{{ stat.color }} stat-link">
+        <span class="stat-icon" aria-hidden="true">{{ stat.icon }}</span>
+        <span class="stat-label">{{ stat.label }}</span>
+        <span class="stat-value" data-count="{{ stat.value }}">{{ stat.value }}</span>
+        <span class="stat-hint">{{ stat.hint }}</span>
+    </a>
+    {% endfor %}
+</div>
+
+<div class="chart-grid">
+    <div class="card chart-card" id="cardDaily">
+        <div class="card-header"><h3>Orders created &middot; last 14 days</h3></div>
+        <div class="card-body">
+            <div class="chart-box tall"><canvas id="chartDaily" role="img" aria-label="Line chart of orders created per day over the last 14 days"></canvas></div>
+        </div>
+    </div>
+    <div class="card chart-card" id="cardStatus">
+        <div class="card-header"><h3>Orders by status</h3></div>
+        <div class="card-body">
+            <div class="chart-box short"><canvas id="chartStatus" role="img" aria-label="Doughnut chart of orders by status"></canvas></div>
+            <div class="chart-empty">No orders yet.</div>
+            <ul class="legend-list" id="statusLegend"></ul>
+        </div>
+    </div>
+</div>
+
+<div class="chart-grid">
+    <div class="card chart-card" id="cardCustomers">
+        <div class="card-header"><h3>Top customers by orders</h3></div>
+        <div class="card-body">
+            <div class="chart-box short"><canvas id="chartCustomers" role="img" aria-label="Bar chart of the top customers by number of orders"></canvas></div>
+            <div class="chart-empty">No orders yet.</div>
+        </div>
+    </div>
+    <div class="card chart-card" id="cardProgress">
+        <div class="card-header"><h3>Average progress</h3></div>
+        <div class="card-body">
+            <div class="gauge-wrap">
+                <canvas id="chartProgress" role="img" aria-label="Gauge showing the average progress of tracked orders"></canvas>
+                <div class="gauge-center"><strong id="gaugeValue">0%</strong><span id="gaugeNote"></span></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="chart-grid">
+    <div class="card chart-card">
+        <div class="card-header header-row">
+            <h3>AI insights</h3>
+            <span class="ai-controls">
+                <select class="input ai-lang" aria-label="Summary language"><option value="en">English</option><option value="ur">Roman Urdu</option></select>
+                <button type="button" class="btn btn-primary btn-sm ai-summary-btn" data-scope="portfolio" data-id="">Summarize everything</button>
+            </span>
+        </div>
+        <div class="card-body">
+            <div class="ai-summary-box" hidden></div>
+            <small class="muted">A short plain-language status of all orders. Works without AI too; with an AI key it reads more naturally.</small>
+        </div>
+    </div>
+    <div class="card chart-card">
+        <div class="card-header"><h3>Needs attention</h3></div>
+        <div class="card-body">
+            {% if attention %}
+            <ul class="attention-list">
+                {% for a in attention %}
+                <li><a href="{% url 'orders:detail' a.order.pk %}" class="link"><strong>{{ a.order.order_number }}</strong> &middot; {{ a.order.customer.name }}</a><span class="badge badge-anomaly">No growth &middot; {{ a.count }}</span></li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <div class="empty-state" style="padding:18px">Nothing stuck right now.</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header header-row">
+        <h3>Recent Orders</h3>
+        <a href="{% url 'orders:list' %}" class="link">View all</a>
+    </div>
+    <div class="table-wrap">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Order</th><th>Customer / Channel</th><th>Target</th>
+                    <th style="min-width:140px">Progress</th><th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for o in recent_orders %}
+                {% with p=o.progress %}
+                <tr>
+                    <td>
+                        <a href="{% url 'orders:detail' o.pk %}" class="link"><strong>{{ o.order_number }}</strong></a>
+                        <br><small class="muted">{{ o.created_at|date:"d M Y" }}</small>
+                    </td>
+                    <td><strong>{{ o.customer.name }}</strong><br><small class="muted">{{ o.channel.name }}</small></td>
+                    <td>
+                        <strong>{{ o.target_count }}</strong>
+                        <br><small class="muted">
+                            {% if p.has_observation %}Latest: {{ o.latest_observed_count }}{% else %}Latest: N/A{% endif %}
+                        </small>
+                    </td>
+                    <td>
+                        <div class="progress progress-sm">
+                            <div class="progress-bar {% if p.target_reached %}done{% endif %}" style="width: {{ p.progress_percent }}%"></div>
+                        </div>
+                        <small class="muted">{% if p.has_observation %}{{ p.progress_percent }}%{% else %}No data{% endif %}</small>
+                    </td>
+                    <td><span class="badge badge-{{ o.status }}">{{ o.get_status_display }}</span></td>
+                </tr>
+                {% endwith %}
+                {% empty %}
+                <tr><td colspan="5" class="empty-state">No orders yet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{{ chart_data|json_script:"chart-data" }}
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/vendor/chart.umd.js' %}"></script>
+<script src="{% static 'js/dashboard.js' %}"></script>
+<script src="{% static 'js/ai.js' %}"></script>
+{% endblock %}

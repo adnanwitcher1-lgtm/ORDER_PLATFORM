@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Reports{% endblock %}
+{% block page_title %}Reports{% endblock %}
+
+{% block content %}
+<div class="welcome">
+    <h2>Reports</h2>
+    <p>Open a report, apply filters, and export to CSV or PDF.</p>
+</div>
+
+<div class="report-cards">
+    {% for r in reports %}
+    <a href="{% url 'reports:detail' r.key %}" class="report-card">
+        <h3>{{ r.title }}</h3>
+        <p class="muted">{{ r.description }}</p>
+    </a>
+    {% empty %}
+    <div class="card"><div class="card-body empty-state">No reports are available for your role.</div></div>
+    {% endfor %}
+</div>
+{% endblock %}

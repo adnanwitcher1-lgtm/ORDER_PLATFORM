@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}{{ connection.label }}{% endblock %}
+{% block page_title %}Google Account{% endblock %}
+
+{% block content %}
+{% if connection.status == "needs_reauth" %}
+<div class="alert alert-warning">
+    This account's authorization has expired or been revoked. Please <strong>Reauthorize</strong>.
+</div>
+{% endif %}
+
+<div class="card section-gap">
+    <div class="card-header header-row">
+        <h3>{{ connection.label }}</h3>
+        <span class="badge badge-{{ connection.status }}">{{ connection.get_status_display }}</span>
+    </div>
+    <div class="card-body">
+        <dl class="info-list">
+            <dt>Google account</dt><dd>{{ connection.google_email|default:"-" }}</dd>
+            <dt>Connected by</dt><dd>{{ connection.connected_by.display_name|default:"-" }}</dd>
+            <dt>Connected on</dt><dd>{{ connection.connected_at|date:"d M Y, h:i A" }}</dd>
+            <dt>Last successful check</dt>
+            <dd>{% if connection.last_checked_at %}{{ connection.last_checked_at|date:"d M Y, h:i A" }}{% else %}Never{% endif %}</dd>
+            <dt>Last error</dt><dd>{{ connection.last_error|default:"-" }}</dd>
+            <dt>Permissions</dt>
+            <dd>{% if connection.scopes %}Email, YouTube read-only (view access only){% else %}-{% endif %}</dd>
+            {% if connection.disconnected_at %}
+            <dt>Disconnected</dt>
+            <dd>{{ connection.disconnected_by.display_name|default:"-" }}, {{ connection.disconnected_at|date:"d M Y, h:i A" }}</dd>
+            {% endif %}
+            <dt>Notes</dt><dd>{{ connection.notes|default:"-"|linebreaksbr }}</dd>
+        </dl>
+        <div class="form-actions">
+            <a href="{% url 'google:list' %}" class="btn btn-light">Back</a>
+            {% if can_manage %}
+                <a href="{% url 'google:edit' connection.pk %}" class="btn btn-primary">Edit label / notes</a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header"><h3>Audit History</h3></div>
+    <div class="table-wrap">
+        <table class="table">
+            <thead><tr><th>When</th><th>Action</th><th>By</th><th>Note</th></tr></thead>
+            <tbody>
+                {% for e in events %}
+                <tr>
+                    <td>{{ e.created_at|date:"d M Y, h:i A" }}</td>
+                    <td><strong>{{ e.action }}</strong></td>
+                    <td>{{ e.actor.display_name|default:"System" }}</td>
+                    <td>{{ e.note|default:"-" }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="4" class="empty-state">No history yet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

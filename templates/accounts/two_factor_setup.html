@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Set up 2FA{% endblock %}
+{% block page_title %}Set up two-factor authentication{% endblock %}
+
+{% block content %}
+<div class="card form-card">
+    <div class="card-body">
+        <ol class="setup-steps">
+            <li><strong>Install</strong> an authenticator app (Google Authenticator, Microsoft Authenticator, Authy, 1Password...).</li>
+            <li><strong>Scan</strong> this QR code in the app, or type the key by hand.</li>
+            <li><strong>Enter</strong> the 6-digit code the app shows.</li>
+        </ol>
+        <div class="qr-box">{{ qr_svg }}</div>
+        <p class="center muted">Can't scan? Enter this key manually:</p>
+        <p class="center"><code class="secret-key">{{ secret }}</code></p>
+        {% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
+        <form method="post" novalidate autocomplete="off">
+            {% csrf_token %}
+            <div class="form-group">
+                <label for="code">6-digit code</label>
+                <input type="text" id="code" name="code" class="input code-input" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="123456" autofocus required>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Turn on 2FA</button>
+                <a href="{% url 'accounts:security' %}" class="btn btn-light">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

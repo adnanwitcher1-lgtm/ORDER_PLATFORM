@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Security{% endblock %}
+{% block page_title %}Security{% endblock %}
+
+{% block content %}
+<div class="card section-gap">
+    <div class="card-header header-row">
+        <h3>Two-factor authentication</h3>
+        <span class="badge {% if has_2fa %}badge-active{% else %}badge-archived{% endif %}">{% if has_2fa %}On{% else %}Off{% endif %}</span>
+    </div>
+    <div class="card-body">
+        {% if has_2fa %}
+        <p class="muted">Sign-in needs a 6-digit code from your authenticator app. You have <strong>{{ recovery_left }}</strong> unused recovery code{{ recovery_left|pluralize }}.</p>
+        <div class="security-forms">
+            <form method="post" action="{% url 'accounts:recovery_regenerate' %}" class="security-form">
+                {% csrf_token %}
+                <h4>New recovery codes</h4>
+                <input type="password" name="password" class="input" placeholder="Current password" required autocomplete="current-password">
+                <input type="text" name="code" class="input" placeholder="Authenticator code" required autocomplete="one-time-code">
+                <button class="btn btn-light btn-sm">Create new codes</button>
+            </form>
+            {% if not require_2fa %}
+            <form method="post" action="{% url 'accounts:two_factor_disable' %}" class="security-form" data-confirm="Turn off two-factor authentication?">
+                {% csrf_token %}
+                <h4>Turn off</h4>
+                <input type="password" name="password" class="input" placeholder="Current password" required autocomplete="current-password">
+                <input type="text" name="code" class="input" placeholder="Authenticator code" required autocomplete="one-time-code">
+                <button class="btn btn-danger btn-sm">Turn off 2FA</button>
+            </form>
+            {% endif %}
+        </div>
+        {% else %}
+        <p class="muted">Add a second step to your sign-in. This platform holds Google account tokens, so we strongly recommend it.{% if require_2fa %} <strong>It is required for all users.</strong>{% endif %}</p>
+        <a href="{% url 'accounts:two_factor_setup' %}" class="btn btn-success">Set up authenticator app</a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card section-gap">
+    <div class="card-header header-row">
+        <h3>Your sessions</h3>
+        {% if sessions|length > 1 %}
+        <form method="post" action="{% url 'accounts:session_revoke_others' %}" data-confirm="Sign out all other sessions?">
+            {% csrf_token %}<button class="btn btn-warning btn-sm">Sign out all others</button>
+        </form>
+        {% endif %}
+    </div>
+    <div class="table-wrap">
+        <table class="table">
+            <thead><tr><th>Device</th><th>IP address</th><th>Signed in</th><th>Last active</th><th></th></tr></thead>
+            <tbody>
+                {% for s in sessions %}
+                <tr>
+                    <td>{{ s.user_agent|truncatechars:70|default:"Unknown device" }}{% if s.session_key == current_key %} <span class="badge badge-active">This device</span>{% endif %}</td>
+                    <td>{{ s.ip_address|default:"-" }}</td>
+                    <td>{{ s.created_at|date:"d M Y, H:i" }}</td>
+                    <td>{{ s.last_seen|timesince }} ago</td>
+                    <td class="actions">
+                        {% if s.session_key != current_key %}
+                        <form method="post" action="{% url 'accounts:session_revoke' s.pk %}">{% csrf_token %}<button class="btn btn-light btn-sm">Sign out</button></form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="5" class="empty-state">No sessions found.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header"><h3>Password</h3></div>
+    <div class="card-body">
+        <p class="muted">Changing your password signs out all your other sessions.</p>
+        <a href="{% url 'accounts:password_change' %}" class="btn btn-primary">Change password</a>
+    </div>
+</div>
+{% endblock %}

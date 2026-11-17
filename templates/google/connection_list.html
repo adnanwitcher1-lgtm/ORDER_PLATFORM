@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Google Accounts{% endblock %}
+{% block page_title %}Google Accounts{% endblock %}
+
+{% block content %}
+{% if can_manage and not configured %}
+<div class="alert alert-warning">
+    Google OAuth is not configured yet. Add <code>GOOGLE_OAUTH_CLIENT_ID</code>,
+    <code>GOOGLE_OAUTH_CLIENT_SECRET</code> and <code>TOKEN_ENCRYPTION_KEY</code> to <code>.env</code> and restart the server.
+</div>
+{% endif %}
+
+{% if reauth_count %}
+<div class="alert alert-warning">
+    <strong>{{ reauth_count }}</strong> account{{ reauth_count|pluralize }} {{ reauth_count|pluralize:'needs,need' }} reauthorization.
+    <a href="?status=needs_reauth" class="link"><strong>View</strong></a>
+</div>
+{% endif %}
+
+<div class="toolbar">
+    <form method="get" class="filters">
+        <select name="status" class="input">
+            <option value="">All statuses</option>
+            {% for value, label in status_choices %}
+                <option value="{{ value }}" {% if status == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit" class="btn btn-primary">Filter</button>
+    </form>
+    <div class="quick-actions">
+        <span class="muted">Connected: <strong>{{ connected_count }}</strong></span>
+        {% if can_manage %}
+            <a href="{% url 'google:connect' %}" class="btn btn-success">+ Connect Google Account</a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card">
+    <div class="table-wrap">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Account</th><th>Status</th><th>Connected by</th>
+                    <th>Last successful check</th><th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in page_obj %}
+                <tr>
+                    <td>
+                        <a href="{% url 'google:detail' c.pk %}" class="link"><strong>{{ c.label }}</strong></a>
+                        <br><small class="muted">{{ c.google_email|default:"-" }}</small>
+                    </td>
+                    <td>
+                        <span class="badge badge-{{ c.status }}">{{ c.get_status_display }}</span>
+                        {% if c.last_error %}<br><small class="muted">{{ c.last_error }}</small>{% endif %}
+                    </td>
+                    <td>
+                        {{ c.connected_by.display_name|default:"-" }}
+                        <br><small class="muted">{{ c.connected_at|date:"d M Y" }}</small>
+                    </td>
+                    <td>{% if c.last_checked_at %}{{ c.last_checked_at|date:"d M Y, h:i A" }}{% else %}<span class="muted">Never</span>{% endif %}</td>
+                    <td class="actions">
+                        <a href="{% url 'google:detail' c.pk %}" class="btn btn-light btn-sm">View</a>
+                        {% if can_manage %}
+                            {% if c.status != "disconnected" and c.status != "disabled" %}
+                            <form method="post" action="{% url 'google:check' c.pk %}">
+                                {% csrf_token %}
+                                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                <button class="btn btn-primary btn-sm">Check</button>
+                            </form>
+                            {% endif %}
+                            <form method="post" action="{% url 'google:reauthorize' c.pk %}">
+                                {% csrf_token %}
+                                <button class="btn btn-warning btn-sm">{% if c.status == "disconnected" %}Reconnect{% else %}Reauthorize{% endif %}</button>
+                            </form>
+                            {% if c.status != "disconnected" %}
+                            <form method="post" action="{% url 'google:disconnect' c.pk %}"
+                                  onsubmit="return confirm('The account will be disconnected and its token revoked at Google. Are you sure?');">
+                                {% csrf_token %}
+                                <button class="btn btn-danger btn-sm">Disconnect</button>
+                            </form>
+                            {% endif %}
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="5" class="empty-state">No Google account connected yet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% include "includes/pagination.html" %}
+{% endblock %}

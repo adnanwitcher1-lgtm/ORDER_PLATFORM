@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Orders{% endblock %}
+{% block page_title %}Orders{% endblock %}
+
+{% block content %}
+<form method="get" class="ask-bar" role="search">
+    <input type="text" name="ask" value="{{ ask }}" class="input" maxlength="200" placeholder='Smart search: try "paused orders for Bilal", "high priority review", "stalled today"'>
+    <button type="submit" class="btn btn-primary">Ask</button>
+    {% if ask %}<a href="{% url 'orders:list' %}" class="btn btn-light">Clear</a>{% endif %}
+</form>
+{% if ask %}
+<div class="chip-row">
+    {% if ask_chips %}<span class="muted">Showing:</span>{% for chip in ask_chips %}<span class="chip">{{ chip }}</span>{% endfor %}{% if ask_ai %}<small class="muted">(understood with AI)</small>{% endif %}
+    {% elif ask_failed %}<span class="alert alert-warning" style="margin:0">Sorry, that sentence was not understood. Try words like a customer name, a status (paused, completed, review), a priority (high), "stalled", "overdue" or "today".</span>{% endif %}
+</div>
+{% endif %}
+
+<div class="toolbar">
+    <form method="get" class="filters">
+        <input type="text" name="q" value="{{ q }}" class="input" placeholder="Search customer, channel, ORD-00001">
+        <select name="status" class="input">
+            <option value="">All statuses</option>
+            {% for value, label in status_choices %}
+                <option value="{{ value }}" {% if status == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+        <select name="priority" class="input">
+            <option value="">All priorities</option>
+            {% for value, label in priority_choices %}
+                <option value="{{ value }}" {% if priority == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit" class="btn btn-primary">Filter</button>
+    </form>
+    {% if can_edit %}
+        <a href="{% url 'orders:create' %}" class="btn btn-success">+ New Order</a>
+    {% endif %}
+</div>
+
+<div class="card">
+    <div class="table-wrap">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Order</th><th>Customer / Channel</th><th>Baseline &rarr; Target</th>
+                    <th>Latest</th><th style="min-width:140px">Progress</th>
+                    <th>Status</th><th>Priority</th><th>Assigned</th><th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for o in page_obj %}
+                {% with p=o.progress %}
+                <tr>
+                    <td><a href="{% url 'orders:detail' o.pk %}" class="link"><strong>{{ o.order_number }}</strong></a>
+                        <br><small class="muted">{{ o.created_at|date:"d M Y" }}</small></td>
+                    <td><strong>{{ o.customer.name }}</strong><br><small class="muted">{{ o.channel.name }}</small></td>
+                    <td>{{ o.baseline_count }} &rarr; <strong>{{ o.target_count }}</strong>
+                        <br><small class="muted">+{{ o.requested_increase }}</small></td>
+                    <td>{% if p.has_observation %}{{ o.latest_observed_count }}{% else %}<span class="muted">N/A</span>{% endif %}</td>
+                    <td>
+                        <div class="progress progress-sm">
+                            <div class="progress-bar {% if p.target_reached %}done{% endif %}" style="width: {{ p.progress_percent }}%"></div>
+                        </div>
+                        <small class="muted">{% if p.has_observation %}{{ p.progress_percent }}%{% else %}No data{% endif %}</small>
+                    </td>
+                    <td><span class="badge badge-{{ o.status }}">{{ o.get_status_display }}</span></td>
+                    <td><span class="badge badge-prio-{{ o.priority }}">{{ o.get_priority_display }}</span></td>
+                    <td>{{ o.assigned_to.display_name|default:"-" }}</td>
+                    <td class="actions">
+                        <a href="{% url 'orders:detail' o.pk %}" class="btn btn-light btn-sm">View</a>
+                    </td>
+                </tr>
+                {% endwith %}
+                {% empty %}
+                <tr><td colspan="9" class="empty-state">No orders found.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% include "includes/pagination.html" %}
+{% endblock %}

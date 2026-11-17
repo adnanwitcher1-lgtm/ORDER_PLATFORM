@@ -1,0 +1,87 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Dashboard{% endblock %} | Order Platform</title>
+    <script>
+        (function () {
+            var theme = "light";
+            try {
+                var saved = localStorage.getItem("theme");
+                if (saved === "dark" || saved === "light") { theme = saved; }
+                else if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) { theme = "dark"; }
+            } catch (e) {}
+            document.documentElement.setAttribute("data-theme", theme);
+        })();
+    </script>
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+<body>
+<div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+        <div class="brand">
+            <span class="brand-icon">OP</span>
+            <span class="brand-text">Order Platform</span>
+        </div>
+
+                <nav class="nav">
+            <a href="{% url 'core:dashboard' %}" class="nav-link {% if request.resolver_match.app_name == 'core' %}active{% endif %}">Dashboard</a>
+            <a href="{% url 'customers:list' %}" class="nav-link {% if request.resolver_match.app_name == 'customers' %}active{% endif %}">Customers</a>
+            <a href="{% url 'channels:list' %}" class="nav-link {% if request.resolver_match.app_name == 'channels' %}active{% endif %}">Channels</a>
+            <a href="{% url 'orders:list' %}" class="nav-link {% if request.resolver_match.app_name == 'orders' %}active{% endif %}">Orders</a>
+                        {% if user.is_superuser or user.role == "manager" or user.role == "operator" or user.role == "auditor" %}
+            <a href="{% url 'google:list' %}" class="nav-link {% if request.resolver_match.app_name == 'google' %}active{% endif %}">Google Accounts</a>
+            {% endif %}
+                        {% if user.is_superuser or user.role == "manager" or user.role == "sales" or user.role == "operator" or user.role == "auditor" %}
+            <a href="{% url 'reports:index' %}" class="nav-link {% if request.resolver_match.app_name == 'reports' %}active{% endif %}">Reports</a>
+            {% endif %}
+            {% if user.is_superuser %}
+                            <a href="{% url 'core:settings' %}" class="nav-link {% if request.resolver_match.url_name == 'settings' %}active{% endif %}">Settings</a>
+                <a href="{% url 'admin:index' %}" class="nav-link">Admin Panel</a>
+            {% endif %}
+        </nav>
+    </aside>
+
+    <div class="main">
+        <header class="topbar">
+            <button class="menu-btn" id="menuBtn" aria-label="Toggle menu">&#9776;</button>
+            <h1 class="page-title">{% block page_title %}Dashboard{% endblock %}</h1>
+            <div class="topbar-right">
+                <button type="button" class="theme-toggle" id="themeToggle" aria-label="Switch between light and dark theme" title="Switch theme">
+                    <span class="icon-moon">&#127769;</span><span class="icon-sun">&#9728;&#65039;</span>
+                </button>
+                            <a href="{% url 'notifications:list' %}" class="bell" title="Notifications">
+                    <span>&#128276;</span>
+                    {% if unread_notifications %}<span class="bell-count">{{ unread_notifications }}</span>{% endif %}
+                </a>
+                <a href="{% url 'accounts:security' %}" class="user-chip user-chip-link" title="Security: 2FA and sessions">
+                    <span class="avatar">{{ user.display_name|slice:":1"|upper }}</span>
+                    <div class="user-info">
+                        <strong>{{ user.display_name }}</strong>
+                        <small>{{ user.get_role_display }}</small>
+                    </div>
+                </a>
+                <form method="post" action="{% url 'accounts:logout' %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger btn-sm">Logout</button>
+                </form>
+            </div>
+        </header>
+
+        <main class="content">
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+</div>
+<script src="{% static 'js/app.js' %}"></script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

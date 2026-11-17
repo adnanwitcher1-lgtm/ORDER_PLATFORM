@@ -1,0 +1,34 @@
+{% extends "portal/base.html" %}
+{% load static %}
+{% block title %}{{ row.number }}{% endblock %}
+{% block content %}
+<p><a href="{% url 'portal:home' token %}" class="link">&larr; All orders</a></p>
+<div class="welcome header-row">
+    <div>
+        <h2>{{ row.number }} &middot; {{ row.channel }}</h2>
+        <p>{{ customer.name }}</p>
+    </div>
+    <span class="badge badge-tone-{{ row.tone }}">{{ row.status_label }}</span>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card stat-blue"><span class="stat-label">Starting count</span><span class="stat-value">{{ row.baseline|floatformat:"0g" }}</span></div>
+    <div class="stat-card stat-green"><span class="stat-label">Latest count{% if row.approximate %} (approx.){% endif %}</span><span class="stat-value">{% if row.latest is None %}-{% else %}{{ row.latest|floatformat:"0g" }}{% endif %}</span></div>
+    <div class="stat-card stat-amber"><span class="stat-label">Target</span><span class="stat-value">{{ row.target|floatformat:"0g" }}</span></div>
+    <div class="stat-card stat-red"><span class="stat-label">Progress</span><span class="stat-value">{% if row.percent is None %}-{% else %}{{ row.percent }}%{% endif %}</span></div>
+</div>
+
+<div class="card section-gap chart-card">
+    <div class="card-header"><h3>Growth</h3></div>
+    <div class="card-body">
+        {% if show_eta and chart_data.eta.message %}<p class="eta-line eta-{{ chart_data.eta.state }}">{{ chart_data.eta.message }}</p>{% endif %}
+        <div class="chart-box"><canvas id="chartGrowth" role="img" aria-label="Line chart of the observed count over time against the target"></canvas></div>
+        {% if row.updated_at %}<small class="muted">Last updated {{ row.updated_at|date:"d M Y, H:i" }}</small>{% endif %}
+    </div>
+</div>
+{{ chart_data|json_script:"order-chart-data" }}
+{% endblock %}
+{% block extra_js %}
+<script src="{% static 'js/vendor/chart.umd.js' %}"></script>
+<script src="{% static 'js/order_chart.js' %}"></script>
+{% endblock %}

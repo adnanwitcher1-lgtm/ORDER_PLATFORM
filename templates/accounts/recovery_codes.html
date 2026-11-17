@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Recovery codes{% endblock %}
+{% block page_title %}Recovery codes{% endblock %}
+
+{% block content %}
+<div class="card form-card">
+    <div class="card-body">
+        {% if just_enabled %}<div class="alert alert-success">Two-factor authentication is now on.</div>{% endif %}
+        <div class="alert alert-warning">Save these codes now. Each one works <strong>once</strong> if you lose your phone. They will not be shown again.</div>
+        <div class="code-grid">
+            {% for c in codes %}<code>{{ c }}</code>{% endfor %}
+        </div>
+        <div class="form-actions">
+            <button type="button" class="btn btn-light" onclick="window.print()">Print</button>
+            <a href="{% url 'accounts:security' %}" class="btn btn-primary">I saved them</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

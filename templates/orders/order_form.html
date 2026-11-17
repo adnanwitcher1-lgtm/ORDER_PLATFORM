@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}{{ title }}{% endblock %}
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="card form-card">
+    <div class="card-body">
+        <form method="post" novalidate id="orderForm"
+              data-channels-url="{% url 'orders:customer_channels' 0 %}">
+            {% csrf_token %}
+            {% if form.non_field_errors %}
+                <div class="alert alert-error">{{ form.non_field_errors }}</div>
+            {% endif %}
+
+            {% for field in form %}
+                {% if field.name != "confirm_duplicate" %}
+                <div class="form-group">
+                    <label for="{{ field.id_for_label }}">
+                        {{ field.label }}{% if field.field.required %} <span class="req">*</span>{% endif %}
+                    </label>
+                    {{ field }}
+                    {% if field.help_text %}<small class="help">{{ field.help_text }}</small>{% endif %}
+                    {% for error in field.errors %}<small class="error-text">{{ error }}</small>{% endfor %}
+                </div>
+                {% endif %}
+            {% endfor %}
+
+            <div class="target-preview">
+                Target preview: <strong id="targetPreview">-</strong>
+                <small>(Baseline + Requested increase)</small>
+            </div>
+
+            {% if form.duplicates %}
+            <div class="dup-box">
+                <strong>Duplicate warning:</strong> this channel already has an open order:
+                <ul>
+                    {% for d in form.duplicates %}
+                        <li><a href="{% url 'orders:detail' d.pk %}" target="_blank" class="link">{{ d.order_number }}</a>
+                            - {{ d.customer.name }}, {{ d.get_status_display }}, target {{ d.target_count }}</li>
+                    {% endfor %}
+                </ul>
+                <label class="check-row">
+                    {{ form.confirm_duplicate }} {{ form.confirm_duplicate.label }}
+                </label>
+                {% for error in form.confirm_duplicate.errors %}<small class="error-text">{{ error }}</small>{% endfor %}
+            </div>
+            {% endif %}
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Save as Draft</button>
+                <a href="{% if order %}{% url 'orders:detail' order.pk %}{% else %}{% url 'orders:list' %}{% endif %}" class="btn btn-light">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/orders.js' %}"></script>
+{% endblock %}

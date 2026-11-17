@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Channels{% endblock %}
+{% block page_title %}Channels{% endblock %}
+
+{% block content %}
+<div class="toolbar">
+    <form method="get" class="filters">
+        <input type="text" name="q" value="{{ q }}" class="input" placeholder="Search channel, URL, customer">
+        <select name="customer" class="input">
+            <option value="">All customers</option>
+            {% for c in customers %}
+                <option value="{{ c.pk }}" {% if customer_id == c.pk|stringformat:"s" %}selected{% endif %}>{{ c.name }}</option>
+            {% endfor %}
+        </select>
+        <select name="status" class="input">
+            <option value="active" {% if status == "active" %}selected{% endif %}>Active</option>
+            <option value="archived" {% if status == "archived" %}selected{% endif %}>Archived</option>
+            <option value="all" {% if status == "all" %}selected{% endif %}>All</option>
+        </select>
+        <button type="submit" class="btn btn-primary">Filter</button>
+    </form>
+    {% if can_edit %}
+        <a href="{% url 'channels:create' %}" class="btn btn-success">+ Add Channel</a>
+    {% endif %}
+</div>
+
+<div class="card">
+    <div class="table-wrap">
+        <table class="table">
+            <thead>
+                <tr><th>Channel</th><th>Customer</th><th>URL</th><th>Status</th><th></th></tr>
+            </thead>
+            <tbody>
+                {% for ch in page_obj %}
+                <tr>
+                    <td><strong>{{ ch.name }}</strong></td>
+                    <td><a href="{% url 'customers:detail' ch.customer.pk %}" class="link">{{ ch.customer.name }}</a></td>
+                    <td><a href="{{ ch.url }}" target="_blank" rel="noopener noreferrer" class="link">{{ ch.url|truncatechars:45 }}</a></td>
+                    <td><span class="badge badge-{{ ch.status }}">{{ ch.get_status_display }}</span></td>
+                    <td class="actions">
+                        {% if can_edit %}
+                            <a href="{% url 'channels:update' ch.pk %}" class="btn btn-primary btn-sm">Edit</a>
+                            <form method="post" action="{% url 'channels:archive' ch.pk %}"
+                                  onsubmit="return confirm('Are you sure you want to change the status?');">
+                                {% csrf_token %}
+                                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                {% if ch.status == "active" %}
+                                    <button class="btn btn-warning btn-sm">Archive</button>
+                                {% else %}
+                                    <button class="btn btn-success btn-sm">Restore</button>
+                                {% endif %}
+                            </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="5" class="empty-state">No channels found.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% include "includes/pagination.html" %}
+{% endblock %}

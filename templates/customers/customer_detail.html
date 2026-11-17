@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}{{ customer.name }}{% endblock %}
+{% block page_title %}Customer Detail{% endblock %}
+
+{% block content %}
+<div class="card section-gap">
+    <div class="card-header header-row">
+        <h3>{{ customer.name }}</h3>
+        <span class="badge badge-{{ customer.status }}">{{ customer.get_status_display }}</span>
+    </div>
+    <div class="card-body">
+        <dl class="info-list">
+            <dt>Email</dt><dd>{{ customer.email|default:"-" }}</dd>
+            <dt>Phone</dt><dd>{{ customer.phone|default:"-" }}</dd>
+            <dt>Added by</dt><dd>{{ customer.created_by.display_name|default:"-" }}</dd>
+            <dt>Added on</dt><dd>{{ customer.created_at|date:"d M Y, h:i A" }}</dd>
+            <dt>Weekly email</dt><dd>{% if customer.weekly_report_enabled %}On{% if customer.last_report_sent_at %} &middot; last sent {{ customer.last_report_sent_at|date:"d M Y" }}{% endif %}{% else %}Off{% endif %}</dd>
+            <dt>Weekly WhatsApp</dt><dd>{% if customer.weekly_whatsapp_enabled %}On{% if customer.last_whatsapp_sent_at %} &middot; last sent {{ customer.last_whatsapp_sent_at|date:"d M Y" }}{% endif %}{% else %}Off{% endif %}</dd>
+            <dt>Notes</dt><dd>{{ customer.notes|default:"-"|linebreaksbr }}</dd>
+        </dl>
+        <div class="form-actions">
+            <a href="{% url 'customers:list' %}" class="btn btn-light">Back</a>
+            {% if can_edit %}
+                <a href="{% url 'customers:update' customer.pk %}" class="btn btn-primary">Edit</a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="card section-gap">
+    <div class="card-header header-row">
+        <h3>Client Portal &amp; Reports</h3>
+        <span class="badge {% if customer.portal_is_live %}badge-active{% else %}badge-archived{% endif %}">{% if customer.portal_is_live %}Link active{% else %}Link off{% endif %}</span>
+    </div>
+    <div class="card-body portal-box">
+        {% if portal_url %}
+        <div class="copy-row">
+            <input type="text" class="input" id="portalUrl" value="{{ portal_url }}" readonly>
+            <button type="button" class="btn btn-light" id="copyPortal">Copy link</button>
+            <a href="{{ portal_url }}" target="_blank" rel="noopener noreferrer" class="btn btn-light">Open</a>
+            {% if whatsapp_url %}<a href="{{ whatsapp_url }}" target="_blank" rel="noopener noreferrer" class="btn btn-whatsapp">Send on WhatsApp</a>{% endif %}
+        </div>
+        <small class="muted">Anyone with this link can see this customer's order progress (read-only, no staff data). {% if customer.portal_last_viewed_at %}Last viewed {{ customer.portal_last_viewed_at|date:"d M Y, H:i" }}.{% else %}Not opened yet.{% endif %}{% if not whatsapp_url %} Add a phone number to enable the WhatsApp button.{% endif %}</small>
+        {% else %}
+        <small class="muted">The portal link is off. Turn it on to give this customer a private, read-only page with live progress.</small>
+        {% endif %}
+        <div class="form-actions" style="flex-wrap:wrap">
+            {% if can_edit and customer.status == "active" %}
+                {% if customer.portal_is_live %}
+                <form method="post" action="{% url 'customers:portal_action' customer.pk 'regenerate' %}" data-confirm="Create a new link? The old link will stop working.">{% csrf_token %}<button class="btn btn-warning btn-sm">New link</button></form>
+                <form method="post" action="{% url 'customers:portal_action' customer.pk 'disable' %}" data-confirm="Disable the portal link?">{% csrf_token %}<button class="btn btn-danger btn-sm">Disable</button></form>
+                {% else %}
+                <form method="post" action="{% url 'customers:portal_action' customer.pk 'enable' %}">{% csrf_token %}<button class="btn btn-success btn-sm">Enable portal link</button></form>
+                {% endif %}
+            {% endif %}
+            <a href="{% url 'customers:report_pdf' customer.pk %}" class="btn btn-primary btn-sm">Download PDF report</a>
+            {% if can_edit and whatsapp_api and customer.portal_is_live %}
+            <form method="post" action="{% url 'customers:report_whatsapp' customer.pk %}" data-confirm="Send the WhatsApp message to this customer now?">{% csrf_token %}<button class="btn btn-whatsapp btn-sm">Send WhatsApp message now (API)</button></form>
+            {% endif %}
+            {% if can_edit and customer.email %}
+            <form method="post" action="{% url 'customers:report_email' customer.pk %}" data-confirm="Email the PDF report to {{ customer.email }}?">{% csrf_token %}<button class="btn btn-light btn-sm">Email report now</button></form>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="card section-gap chart-card">
+    <div class="card-header header-row">
+        <h3>AI summary</h3>
+        <span class="ai-controls">
+            <select class="input ai-lang" aria-label="Summary language"><option value="en">English</option><option value="ur">Roman Urdu</option></select>
+            <button type="button" class="btn btn-light btn-sm ai-summary-btn" data-scope="customer" data-id="{{ customer.pk }}">Generate</button>
+        </span>
+    </div>
+    <div class="card-body"><div class="ai-summary-box" hidden></div><small class="muted">A short plain-language status of this customer's orders.</small></div>
+</div>
+
+<div class="card">
+    <div class="card-header header-row">
+        <h3>Channels ({{ channels|length }})</h3>
+        {% if can_edit and customer.status == "active" %}
+            <a href="{% url 'channels:create' %}?customer={{ customer.pk }}" class="btn btn-success btn-sm">+ Add Channel</a>
+        {% endif %}
+    </div>
+    <div class="table-wrap">
+        <table class="table">
+            <thead><tr><th>Name</th><th>URL</th><th>Status</th></tr></thead>
+            <tbody>
+                {% for ch in channels %}
+                <tr>
+                    <td><strong>{{ ch.name }}</strong></td>
+                    <td><a href="{{ ch.url }}" target="_blank" rel="noopener noreferrer" class="link">{{ ch.url }}</a></td>
+                    <td><span class="badge badge-{{ ch.status }}">{{ ch.get_status_display }}</span></td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="3" class="empty-state">This customer has no channels.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/ai.js' %}"></script>
+<script>
+(function () {
+    var btn = document.getElementById("copyPortal");
+    if (!btn) { return; }
+    btn.addEventListener("click", function () {
+        var input = document.getElementById("portalUrl");
+        input.select();
+        try { navigator.clipboard.writeText(input.value); } catch (e) { document.execCommand("copy"); }
+        btn.textContent = "Copied!";
+        setTimeout(function () { btn.textContent = "Copy link"; }, 1600);
+    });
+})();
+</script>
+{% endblock %}

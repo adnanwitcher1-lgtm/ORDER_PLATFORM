@@ -1,0 +1,41 @@
+{% extends "portal/base.html" %}
+{% block title %}{{ customer.name }}{% endblock %}
+{% block content %}
+<div class="welcome header-row">
+    <div>
+        <h2>Hello, {{ customer.name }}</h2>
+        <p>Live progress of your orders.</p>
+    </div>
+    <a href="{% url 'portal:report' token %}" class="btn btn-primary">Download PDF report</a>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card stat-blue"><span class="stat-label">Orders</span><span class="stat-value" data-count="{{ stats.total }}">{{ stats.total }}</span></div>
+    <div class="stat-card stat-green"><span class="stat-label">In progress</span><span class="stat-value" data-count="{{ stats.in_progress }}">{{ stats.in_progress }}</span></div>
+    <div class="stat-card stat-amber"><span class="stat-label">Completed</span><span class="stat-value" data-count="{{ stats.completed }}">{{ stats.completed }}</span></div>
+    <div class="stat-card stat-red"><span class="stat-label">Average progress</span><span class="stat-value"><span data-count="{{ stats.average }}">{{ stats.average }}</span>%</span></div>
+</div>
+
+<div class="portal-orders">
+    {% for r in rows %}
+    <a class="card portal-order" href="{% url 'portal:order' token r.pk %}">
+        <div class="header-row">
+            <div>
+                <strong>{{ r.number }}</strong>
+                <div class="muted">{{ r.channel }}</div>
+            </div>
+            <span class="badge badge-tone-{{ r.tone }}">{{ r.status_label }}</span>
+        </div>
+        <div class="progress" style="margin:14px 0 8px">
+            <div class="progress-bar {% if r.reached %}done{% endif %}" style="width: {{ r.percent|default:0 }}%"></div>
+        </div>
+        <div class="header-row">
+            <small class="muted">{% if r.percent is not None %}{{ r.percent }}% &middot; {{ r.latest }} of {{ r.target }}{% else %}Waiting for the first count{% endif %}</small>
+            {% if r.updated_at %}<small class="muted">Updated {{ r.updated_at|date:"d M, H:i" }}</small>{% endif %}
+        </div>
+    </a>
+    {% empty %}
+    <div class="card"><div class="empty-state">No orders to show yet.</div></div>
+    {% endfor %}
+</div>
+{% endblock %}

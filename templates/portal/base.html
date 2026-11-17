@@ -1,0 +1,42 @@
+{% load static %}<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <title>{% block title %}Progress{% endblock %} | {{ brand }}</title>
+    <script>
+        (function () {
+            var theme = "light";
+            try {
+                var saved = localStorage.getItem("theme");
+                if (saved === "dark" || saved === "light") { theme = saved; }
+                else if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) { theme = "dark"; }
+            } catch (e) {}
+            document.documentElement.setAttribute("data-theme", theme);
+        })();
+    </script>
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+<body class="portal-body">
+    <header class="portal-header">
+        <div class="portal-header-inner">
+            <div class="brand">
+                <span class="brand-icon">{{ brand|slice:":2"|upper }}</span>
+                <span class="brand-text">{{ brand }}</span>
+            </div>
+            <div class="topbar-right">
+                <button type="button" class="theme-toggle" id="themeToggle" aria-label="Switch between light and dark theme" title="Switch theme">
+                    <span class="icon-moon">&#127769;</span><span class="icon-sun">&#9728;&#65039;</span>
+                </button>
+            </div>
+        </div>
+    </header>
+    <main class="portal-main">
+        {% block content %}{% endblock %}
+        <p class="portal-footer muted">Counts are values observed on YouTube at the time shown and may be rounded by YouTube. This page does not guarantee future results.</p>
+    </main>
+    <script src="{% static 'js/app.js' %}"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

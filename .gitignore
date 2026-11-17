@@ -1,0 +1,11 @@
+.env
+db.sqlite3
+backups/
+venv/
+__pycache__/
+*.pyc
+staticfiles/
+
+# real keys for the server (never commit)
+deploy/env.production
+staticfiles/

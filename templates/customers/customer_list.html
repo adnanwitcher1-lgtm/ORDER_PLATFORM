@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Customers{% endblock %}
+{% block page_title %}Customers{% endblock %}
+
+{% block content %}
+<div class="toolbar">
+    <form method="get" class="filters">
+        <input type="text" name="q" value="{{ q }}" class="input" placeholder="Search name, email, phone">
+        <select name="status" class="input">
+            <option value="active" {% if status == "active" %}selected{% endif %}>Active</option>
+            <option value="archived" {% if status == "archived" %}selected{% endif %}>Archived</option>
+            <option value="all" {% if status == "all" %}selected{% endif %}>All</option>
+        </select>
+        <button type="submit" class="btn btn-primary">Search</button>
+    </form>
+    {% if can_edit %}
+        <a href="{% url 'customers:create' %}" class="btn btn-success">+ Add Customer</a>
+    {% endif %}
+</div>
+
+<div class="card">
+    <div class="table-wrap">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Name</th><th>Contact</th><th>Channels</th><th>Status</th><th>Added</th><th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in page_obj %}
+                <tr>
+                    <td><a href="{% url 'customers:detail' c.pk %}" class="link"><strong>{{ c.name }}</strong></a></td>
+                    <td>{{ c.email|default:"-" }}<br><small class="muted">{{ c.phone }}</small></td>
+                    <td>{{ c.channel_count }}</td>
+                    <td><span class="badge badge-{{ c.status }}">{{ c.get_status_display }}</span></td>
+                    <td>{{ c.created_at|date:"d M Y" }}</td>
+                    <td class="actions">
+                        <a href="{% url 'customers:detail' c.pk %}" class="btn btn-light btn-sm">View</a>
+                        {% if can_edit %}
+                            <a href="{% url 'customers:update' c.pk %}" class="btn btn-primary btn-sm">Edit</a>
+                            <form method="post" action="{% url 'customers:archive' c.pk %}"
+                                  onsubmit="return confirm('Are you sure you want to change the status?');">
+                                {% csrf_token %}
+                                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                {% if c.status == "active" %}
+                                    <button class="btn btn-warning btn-sm">Archive</button>
+                                {% else %}
+                                    <button class="btn btn-success btn-sm">Restore</button>
+                                {% endif %}
+                            </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="6" class="empty-state">No customers found.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% include "includes/pagination.html" %}
+{% endblock %}

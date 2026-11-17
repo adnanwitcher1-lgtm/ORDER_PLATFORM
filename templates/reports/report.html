@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}{{ report.title }}{% endblock %}
+{% block page_title %}{{ report.title }}{% endblock %}
+
+{% block content %}
+<div class="card section-gap">
+    <div class="card-body">
+        <form method="get" class="report-filters">
+            {% for field in form %}
+            <div class="form-group">
+                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% for error in field.errors %}<small class="error-text">{{ error }}</small>{% endfor %}
+            </div>
+            {% endfor %}
+            <div class="form-group filter-actions">
+                <button type="submit" class="btn btn-primary">Apply</button>
+                <a href="{% url 'reports:detail' report.key %}" class="btn btn-light">Reset</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% if valid and data %}
+<div class="toolbar">
+    <a href="{% url 'reports:index' %}" class="btn btn-light">&laquo; All reports</a>
+    <div class="quick-actions">
+        <a href="{% url 'reports:export' report.key 'csv' %}?{{ querystring }}" class="btn btn-success">Export CSV</a>
+        <a href="{% url 'reports:export' report.key 'pdf' %}?{{ querystring }}" class="btn btn-primary">Export PDF</a>
+    </div>
+</div>
+
+{% if data.summary %}
+<div class="stats-grid">
+    {% for label, value in data.summary %}
+    <div class="stat-card stat-blue">
+        <span class="stat-label">{{ label }}</span>
+        <span class="stat-value report-value">{{ value }}</span>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% if data.note %}<div class="alert alert-warning">{{ data.note }}</div>{% endif %}
+{% if display_truncated %}
+<div class="alert alert-info">Only the first {{ display_limit }} rows are shown on screen. The full data is in the CSV.</div>
+{% endif %}
+
+<div class="card">
+    <div class="table-wrap">
+        <table class="table">
+            <thead>
+                <tr>{% for column in data.columns %}<th>{{ column }}</th>{% endfor %}</tr>
+            </thead>
+            <tbody>
+                {% for row in rows %}
+                <tr>{% for cell in row %}<td>{{ cell }}</td>{% endfor %}</tr>
+                {% empty %}
+                <tr><td colspan="{{ data.columns|length }}" class="empty-state">No data for this filter.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
