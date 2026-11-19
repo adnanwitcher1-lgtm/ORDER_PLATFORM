@@ -12,5 +12,6 @@ urlpatterns = [
     path("<int:pk>/edit/", views.connection_edit, name="edit"),
     path("<int:pk>/check/", views.connection_check, name="check"),
     path("<int:pk>/reauthorize/", views.connection_reauthorize, name="reauthorize"),
+    path("<int:pk>/import-channel/", views.connection_import_channel, name="import_channel"),
     path("<int:pk>/disconnect/", views.connection_disconnect, name="disconnect"),
 ]

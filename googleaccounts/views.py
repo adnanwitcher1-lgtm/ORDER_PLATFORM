@@ -58,11 +58,67 @@ def connection_detail(request, pk):
     connection = get_object_or_404(
         GoogleAccountConnection.objects.select_related("connected_by", "disconnected_by"), pk=pk
     )
+    from customers.models import Customer
+    from ytchannels.models import Channel
+
+    channels, channels_error = [], ""
+    if connection.status == S.CONNECTED:
+        try:
+            channels = services.list_channels(connection)
+        except services.ServiceError as exc:
+            channels_error = str(exc)
+    existing = {
+        c.youtube_channel_id: c
+        for c in Channel.objects.filter(youtube_channel_id__in=[ch["id"] for ch in channels])
+    }
+    for ch in channels:
+        ch["existing"] = existing.get(ch["id"])
     return render(request, "google/connection_detail.html", {
         "connection": connection,
         "events": connection.events.select_related("actor")[:50],
         "can_manage": can_manage_google(request.user),
+        "channels": channels,
+        "channels_error": channels_error,
+        "customers": Customer.objects.filter(status=Customer.Status.ACTIVE).order_by("name"),
     })
+
+
+@role_required(*GOOGLE_MANAGE_ROLES)
+@require_POST
+def connection_import_channel(request, pk):
+    """Add one of the account's own channels to a customer (one click)."""
+    from audit.services import log_audit
+    from customers.models import Customer
+    from ytchannels.models import Channel
+
+    connection = get_object_or_404(GoogleAccountConnection, pk=pk)
+    back = redirect("google:detail", pk=pk)
+    customer = Customer.objects.filter(pk=request.POST.get("customer") or 0, status=Customer.Status.ACTIVE).first()
+    if not customer:
+        messages.error(request, "Choose a customer first.")
+        return back
+    try:
+        channels = services.list_channels(connection)
+    except services.ServiceError as exc:
+        messages.error(request, str(exc))
+        return back
+    # Only a channel the account really returned can be imported (the id is not trusted from the form).
+    chosen = next((c for c in channels if c["id"] == request.POST.get("channel_id")), None)
+    if not chosen:
+        messages.error(request, "That channel is not available on this Google account.")
+        return back
+    clash = Channel.objects.filter(youtube_channel_id=chosen["id"]).first() or \
+        Channel.objects.filter(url=chosen["url"]).first()
+    if clash:
+        messages.error(request, f"This channel is already added as '{clash.name}'.")
+        return back
+    channel = Channel.objects.create(
+        customer=customer, name=chosen["title"] or chosen["id"], url=chosen["url"],
+        youtube_channel_id=chosen["id"], google_connection=connection, created_by=request.user,
+    )
+    log_audit(request, "created", channel)
+    messages.success(request, f"'{channel.name}' added to {customer.name}.")
+    return back
 
 
 @role_required(*GOOGLE_MANAGE_ROLES)

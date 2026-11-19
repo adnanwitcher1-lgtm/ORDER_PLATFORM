@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load yt_extras %}
 {% block title %}{{ connection.label }}{% endblock %}
 {% block page_title %}Google Account{% endblock %}
 
@@ -23,7 +24,7 @@
             <dd>{% if connection.last_checked_at %}{{ connection.last_checked_at|date:"d M Y, h:i A" }}{% else %}Never{% endif %}</dd>
             <dt>Last error</dt><dd>{{ connection.last_error|default:"-" }}</dd>
             <dt>Permissions</dt>
-            <dd>{% if connection.scopes %}Email, YouTube read-only (view access only){% else %}-{% endif %}</dd>
+            <dd>{% if connection.scopes %}Email, YouTube read-only (view access only){% if connection.has_analytics %}, YouTube Analytics read-only{% else %} <span class="badge badge-needs_reauth">Analytics permission missing</span> <small class="muted">Reauthorize this account to enable watch time and exact subscriber change.</small>{% endif %}{% else %}-{% endif %}</dd>
             {% if connection.disconnected_at %}
             <dt>Disconnected</dt>
             <dd>{{ connection.disconnected_by.display_name|default:"-" }}, {{ connection.disconnected_at|date:"d M Y, h:i A" }}</dd>
@@ -38,6 +39,55 @@
         </div>
     </div>
 </div>
+
+{% if connection.status == "connected" %}
+<div class="card section-gap">
+    <div class="card-header"><h3>Channels of this account</h3></div>
+    <div class="card-body">
+        {% if channels_error %}
+            <div class="alert alert-error">{{ channels_error }}</div>
+        {% elif not channels %}
+            <p class="empty-state">YouTube returned no channel for this Google account.</p>
+        {% else %}
+        <div class="table-wrap"><table class="table">
+            <thead><tr><th>Channel</th><th>Subscribers</th><th>Videos</th><th>Views</th><th>Add to a customer</th></tr></thead>
+            <tbody>
+            {% for ch in channels %}
+                <tr>
+                    <td>
+                        <div class="channel-cell">
+                            {% if ch.thumbnail %}<img src="{{ ch.thumbnail }}" alt="" width="36" height="36" class="channel-thumb" referrerpolicy="no-referrer">{% endif %}
+                            <div><strong>{{ ch.title }}</strong>{% if ch.handle %}<br><small class="muted">{{ ch.handle }}</small>{% endif %}</div>
+                        </div>
+                    </td>
+                    <td>{% if ch.subscribers_hidden %}Hidden{% elif ch.subscribers is None %}-{% else %}{{ ch.subscribers|full }}{% endif %}</td>
+                    <td>{{ ch.video_count|full }}</td>
+                    <td>{{ ch.views|full }}</td>
+                    <td>
+                        {% if ch.existing %}
+                            <span class="badge badge-active">Added</span>
+                            <a href="{% url 'channels:detail' ch.existing.pk %}" class="link">{{ ch.existing.customer.name }}</a>
+                        {% elif can_manage %}
+                            <form method="post" action="{% url 'google:import_channel' connection.pk %}" class="inline-form">
+                                {% csrf_token %}
+                                <input type="hidden" name="channel_id" value="{{ ch.id }}">
+                                <select name="customer" class="input" required aria-label="Customer">
+                                    <option value="">Select customer</option>
+                                    {% for c in customers %}<option value="{{ c.pk }}">{{ c.name }}</option>{% endfor %}
+                                </select>
+                                <button type="submit" class="btn btn-primary btn-sm">Import as Channel</button>
+                            </form>
+                        {% else %}-{% endif %}
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table></div>
+        {% endif %}
+        <small class="muted">This connection is for the channel chosen on Google's screen. If the same Google login also manages other (brand) channels, go to Google Accounts &gt; Connect again with the same email and pick the other channel in Google's chooser: each channel becomes its own connection here. Or paste a channel link in Channels &gt; Add Channel (public details only).</small>
+    </div>
+</div>
+{% endif %}
 
 <div class="card">
     <div class="card-header"><h3>Audit History</h3></div>

@@ -7,7 +7,8 @@
 <div class="card form-card">
     <div class="card-body">
         <form method="post" novalidate id="orderForm"
-              data-channels-url="{% url 'orders:customer_channels' 0 %}">
+              data-channels-url="{% url 'orders:customer_channels' 0 %}"
+              data-count-url="{% url 'channels:current_count' 0 %}">
             {% csrf_token %}
             {% if form.non_field_errors %}
                 <div class="alert alert-error">{{ form.non_field_errors }}</div>
@@ -25,6 +26,8 @@
                 </div>
                 {% endif %}
             {% endfor %}
+
+            <div class="baseline-hint" id="baselineHint" hidden></div>
 
             <div class="target-preview">
                 Target preview: <strong id="targetPreview">-</strong>

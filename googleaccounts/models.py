@@ -15,7 +15,10 @@ class GoogleAccountConnection(models.Model):
 
     label = models.CharField(max_length=100)
     google_email = models.EmailField(blank=True)
-    google_sub = models.CharField(max_length=64, unique=True)
+    google_sub = models.CharField(max_length=64, db_index=True)
+    # The YouTube channel this authorization was given for. One Google user can own many brand
+    # channels and Google issues one token per chosen channel, so (google_sub, channel) is the identity.
+    youtube_channel_id = models.CharField(max_length=40, blank=True)
     scopes = models.TextField(blank=True)
     encrypted_refresh_token = models.TextField(blank=True)
     status = models.CharField(max_length=15, choices=Status.choices, default=Status.CONNECTED)
@@ -40,9 +43,16 @@ class GoogleAccountConnection(models.Model):
 
     class Meta:
         ordering = ["label"]
+        constraints = [
+            models.UniqueConstraint(fields=["google_sub", "youtube_channel_id"], name="uniq_google_user_channel"),
+        ]
 
     def __str__(self):
         return f"{self.label} ({self.google_email})"
+
+    @property
+    def has_analytics(self):
+        return "yt-analytics.readonly" in (self.scopes or "")
 
     @property
     def has_token(self):

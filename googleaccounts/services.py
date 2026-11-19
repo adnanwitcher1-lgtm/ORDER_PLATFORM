@@ -18,6 +18,24 @@ def log_event(connection, actor, action, note=""):
     ConnectionEvent.objects.create(connection=connection, actor=actor, action=action, note=note)
 
 
+def _authorized_channel(access_token):
+    """(channel id, title) of the channel chosen on Google's screen; ("", "") if it cannot be read."""
+    from ytchannels import resolver
+    try:
+        items = resolver.fetch_mine(access_token)
+    except Exception:    # best effort: never block a connection because of this lookup
+        return "", ""
+    return (items[0]["id"], items[0].get("title", "")) if items else ("", "")
+
+
+def _find_connection(sub, channel_id):
+    rows = GoogleAccountConnection.objects.filter(google_sub=sub)
+    if channel_id:
+        # same channel, or an older record made before channels were tracked
+        return rows.filter(youtube_channel_id=channel_id).first() or rows.filter(youtube_channel_id="").first()
+    return rows.first()
+
+
 def complete_connection(code, pending, user):
     """Save the account after the OAuth callback. Returns (connection, action)."""
     tokens = oauth.exchange_code(code)
@@ -38,23 +56,33 @@ def complete_connection(code, pending, user):
     if not sub:
         raise ServiceError("The Google account could not be identified.")
 
+    channel_id, channel_title = _authorized_channel(access)
+
     reauth_pk = pending.get("reauth_pk")
+    target = None
     if reauth_pk:
         target = GoogleAccountConnection.objects.filter(pk=reauth_pk).first()
         if target is None or target.google_sub != sub:
             raise ServiceError(
                 "You signed in with the wrong Google account. Choose the account you want to reconnect."
             )
+        if target.youtube_channel_id and channel_id and target.youtube_channel_id != channel_id:
+            raise ServiceError(
+                "You chose a different YouTube channel on Google's screen. Choose the same channel as before, "
+                "or use Connect to add the other channel as a new connection."
+            )
 
     now = timezone.now()
     with transaction.atomic():
-        connection = GoogleAccountConnection.objects.filter(google_sub=sub).first()
+        connection = target or _find_connection(sub, channel_id)
         created = connection is None
         if created:
             connection = GoogleAccountConnection(google_sub=sub)
-            connection.label = pending.get("label") or email
+            connection.label = pending.get("label") or channel_title or email
         elif not reauth_pk:
             connection.label = pending.get("label") or connection.label
+        if channel_id:
+            connection.youtube_channel_id = channel_id
 
         if pending.get("notes"):
             connection.notes = pending["notes"]
@@ -131,3 +159,23 @@ def disconnect_connection(connection, user, note=""):
     )
     log_event(connection, user, "Disconnected", f"{detail} {note}".strip())
     return revoked
+
+
+def list_channels(connection):
+    """The YouTube channels the connected account can read (what YouTube returns for this authorization).
+
+    Raises ServiceError with a message that is safe to show.
+    """
+    from ytchannels import resolver
+    from ytchannels.insights import InsightError
+
+    if connection.status != S.CONNECTED or not connection.has_token:
+        raise ServiceError("Only a connected account can list its channels.")
+    try:
+        access_token = oauth.refresh_access_token(connection.get_refresh_token())
+        return resolver.fetch_mine(access_token)
+    except oauth.NeedsReauth:
+        raise ServiceError("The authorization has expired. Reauthorize this account.")
+    except (oauth.OAuthError, InsightError, TokenCryptoError) as exc:
+        raise ServiceError(str(exc))
+

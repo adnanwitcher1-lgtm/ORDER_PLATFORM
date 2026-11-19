@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+{% load static yt_extras %}
+{% block title %}{{ channel.name }}{% endblock %}
+{% block page_title %}Channel Details{% endblock %}
+
+{% block content %}
+<div class="card section-gap">
+    <div class="card-header header-row">
+        <div class="channel-head">
+            {% if info.thumbnail %}<img src="{{ info.thumbnail }}" alt="" class="channel-thumb" width="56" height="56" referrerpolicy="no-referrer">{% endif %}
+            <div>
+                <h3>{{ channel.name }}</h3>
+                <span class="muted">
+                    {{ channel.customer.name }}
+                    {% if info.title and info.title != channel.name %} &middot; YouTube name: {{ info.title }}{% endif %}
+                    {% if info.handle %} &middot; {{ info.handle }}{% endif %}
+                    {% if info.country %} &middot; {{ info.country }}{% endif %}
+                    {% if info.created %} &middot; since {{ info.created }}{% endif %}
+                </span>
+            </div>
+        </div>
+        <div class="ai-controls">
+            <a href="{{ channel.url }}" target="_blank" rel="noopener noreferrer" class="btn btn-light btn-sm">Open on YouTube</a>
+            {% if can_refresh %}
+            <form method="post" action="{% url 'channels:insights_refresh' channel.pk %}">
+                {% csrf_token %}
+                <button class="btn btn-primary btn-sm">{% if insight %}Refresh details{% else %}Fetch details{% endif %}</button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+    <div class="card-body">
+        {% if insight %}
+            <small class="muted">Last fetched {{ insight.fetched_at|date:"d M Y, h:i A" }}. Public YouTube data only.</small>
+        {% else %}
+            <p class="empty-state">No details yet.{% if can_refresh %} Press <strong>Fetch details</strong> to load subscribers, views, videos and recent uploads from YouTube.{% endif %}</p>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card section-gap">
+    <div class="card-header header-row">
+        <h3>Watch time &amp; exact subscribers (owner Analytics)</h3>
+        {% if can_refresh and can_analytics %}
+        <form method="post" action="{% url 'channels:analytics_refresh' channel.pk %}">{% csrf_token %}
+            <button type="submit" class="btn btn-light btn-sm">Refresh Analytics</button>
+        </form>
+        {% endif %}
+    </div>
+    <div class="card-body">
+        {% if analytics %}
+        {% with t=analytics.data.totals %}
+        <div class="stats-grid">
+            <div class="stat-card stat-blue"><span class="stat-label">Watch time (28 days)</span><span class="stat-value">{{ t.watch_hours }} h</span></div>
+            <div class="stat-card stat-green"><span class="stat-label">Views (28 days)</span><span class="stat-value">{{ t.views|full }}</span></div>
+            <div class="stat-card stat-amber"><span class="stat-label">Subscribers net (exact)</span><span class="stat-value">{{ t.subs_net }}</span><small class="muted">+{{ t.subs_gained }} / -{{ t.subs_lost }}</small></div>
+            <div class="stat-card stat-red"><span class="stat-label">Avg. view duration</span><span class="stat-value">{{ t.avg_view_seconds|duration }}</span></div>
+        </div>
+        {% endwith %}
+        {% if analytics.data.since %}
+        <p><strong>Since the latest order baseline ({{ analytics.data.since.from }}):</strong>
+           exact net subscribers <strong>{{ analytics.data.since.subs_net }}</strong>
+           (+{{ analytics.data.since.subs_gained }} / -{{ analytics.data.since.subs_lost }}), up to {{ analytics.data.since.to }}.</p>
+        {% endif %}
+        <p class="muted">Period {{ analytics.data.period.start }} to {{ analytics.data.period.end }}. Analytics is not real-time: YouTube finishes each day 1-3 days later. Fetched {{ analytics.fetched_at|timesince }} ago.</p>
+        {% elif can_analytics %}
+        <p class="muted">Not loaded yet. Click "Refresh Analytics". It needs the linked Google account to be the channel owner/manager and to have the Analytics permission (reconnect the account once if it was connected earlier).</p>
+        {% else %}
+        <p class="muted">Not available for this channel. Watch time, revenue and exact subscriber changes are visible only to the channel owner. Link the channel to a connected Google account (Import as Channel) to enable them.
+        {% if stats.runtime_hours %}For reference, the last {{ stats.count }} videos are {{ stats.runtime_hours }} hours long in total.{% endif %}</p>
+        {% endif %}
+    </div>
+</div>
+
+{% if insight %}
+<div class="stats-grid">
+    <div class="stat-card stat-blue">
+        <span class="stat-label">Subscribers</span>
+        <span class="stat-value">{% if info.subscribers_hidden %}Hidden{% else %}{{ info.subscribers|compact }}{% endif %}</span>
+        <span class="stat-hint">{% if info.subscribers_hidden %}The channel hides its count{% else %}{{ info.subscribers|full }} (YouTube rounds large counts){% endif %}</span>
+    </div>
+    <div class="stat-card stat-green">
+        <span class="stat-label">Total views</span>
+        <span class="stat-value">{{ info.views|compact }}</span>
+        <span class="stat-hint">{{ info.views|full }}</span>
+    </div>
+    <div class="stat-card stat-amber">
+        <span class="stat-label">Videos</span>
+        <span class="stat-value">{{ info.video_count|full }}</span>
+        <span class="stat-hint">Total uploaded</span>
+    </div>
+    <div class="stat-card stat-blue">
+        <span class="stat-label">Avg views / recent video</span>
+        <span class="stat-value">{{ stats.avg_views|compact }}</span>
+        <span class="stat-hint">Last {{ stats.count|default:0 }} videos &middot; median {{ stats.median_views|compact }}</span>
+    </div>
+    <div class="stat-card stat-green">
+        <span class="stat-label">Upload rhythm</span>
+        <span class="stat-value">{% if stats.uploads_per_week %}{{ stats.uploads_per_week }}/wk{% else %}-{% endif %}</span>
+        <span class="stat-hint">{% if stats.days_since_last is not None %}Last upload {{ stats.days_since_last }} days ago{% else %}No uploads found{% endif %}</span>
+    </div>
+    <div class="stat-card stat-amber">
+        <span class="stat-label">Engagement</span>
+        <span class="stat-value">{% if stats.engagement_pct is not None %}{{ stats.engagement_pct }}%{% else %}-{% endif %}</span>
+        <span class="stat-hint">(Likes + comments) / views, recent videos</span>
+    </div>
+</div>
+
+<div class="card section-gap">
+    <div class="card-header header-row">
+        <h3>AI summary of the content</h3>
+        {% if can_refresh %}
+        <form method="post" action="{% url 'channels:insights_ai' channel.pk %}" class="ai-controls">
+            {% csrf_token %}
+            <select name="lang" class="input" aria-label="Summary language">
+                <option value="en" {% if insight.ai_lang != "ur" %}selected{% endif %}>English</option>
+                <option value="ur" {% if insight.ai_lang == "ur" %}selected{% endif %}>Roman Urdu</option>
+            </select>
+            <button class="btn btn-light btn-sm">Generate summary</button>
+        </form>
+        {% endif %}
+    </div>
+    <div class="card-body">
+        {% if insight.ai_summary %}
+            <div class="ai-summary-box">{{ insight.ai_summary|linebreaksbr }}
+                <small>{% if insight.ai_source == "ai" %}Written by AI from the public titles, tags and statistics.{% else %}Rule-based summary (no AI used).{% endif %} {{ insight.ai_at|date:"d M Y, h:i A" }}</small>
+            </div>
+        {% else %}
+            <p class="muted">No summary yet. It reads the recent video titles, tags and statistics.</p>
+        {% endif %}
+        {% if info.description %}<details><summary class="muted">Channel description</summary><p>{{ info.description|linebreaksbr }}</p></details>{% endif %}
+    </div>
+</div>
+
+{% if videos %}
+<div class="card section-gap chart-card">
+    <div class="card-header"><h3>Views of the recent videos</h3></div>
+    <div class="card-body">
+        <div class="chart-box"><canvas id="chartVideos" role="img" aria-label="Bar chart of the views of the recent videos, oldest to newest"></canvas></div>
+        <small class="muted">Oldest to newest. Newer videos have had less time to collect views.</small>
+    </div>
+</div>
+
+{% if stats.top %}
+<div class="card section-gap">
+    <div class="card-header"><h3>Top videos (recent)</h3></div>
+    <div class="card-body">
+        <div class="table-wrap"><table class="table">
+            <thead><tr><th>Video</th><th>Views</th></tr></thead>
+            <tbody>
+            {% for v in stats.top %}
+                <tr><td><a href="https://www.youtube.com/watch?v={{ v.id }}" target="_blank" rel="noopener noreferrer" class="link">{{ v.title|truncatechars:90 }}</a></td><td>{{ v.views|full }}</td></tr>
+            {% endfor %}
+            </tbody>
+        </table></div>
+    </div>
+</div>
+{% endif %}
+
+<div class="card section-gap">
+    <div class="card-header"><h3>Latest uploads</h3></div>
+    <div class="card-body">
+        <div class="table-wrap"><table class="table">
+            <thead><tr><th>Video</th><th>Date</th><th>Views</th><th>Likes</th><th>Comments</th><th>Length</th></tr></thead>
+            <tbody>
+            {% for v in videos %}
+                <tr>
+                    <td><a href="https://www.youtube.com/watch?v={{ v.id }}" target="_blank" rel="noopener noreferrer" class="link">{{ v.title|truncatechars:70 }}</a></td>
+                    <td>{{ v.published }}</td>
+                    <td>{{ v.views|full }}</td>
+                    <td>{{ v.likes|full }}</td>
+                    <td>{{ v.comments|full }}</td>
+                    <td>{{ v.duration|duration }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table></div>
+        <small class="muted">The latest 20 of up to 50 recent uploads.</small>
+    </div>
+</div>
+{% endif %}
+{% endif %}
+
+<div class="form-actions"><a href="{% url 'channels:list' %}" class="btn btn-light">Back</a></div>
+
+{% if chart_data %}{{ chart_data|json_script:"channel-chart-data" }}{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+{% if chart_data %}
+<script src="{% static 'js/vendor/chart.umd.js' %}"></script>
+<script src="{% static 'js/channel_chart.js' %}"></script>
+{% endif %}
+{% endblock %}

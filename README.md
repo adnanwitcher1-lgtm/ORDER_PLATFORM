@@ -100,6 +100,14 @@ There is an hourly per-user limit (`AI_HOURLY_LIMIT`).
 Solid-colour design, light and dark theme (toggle in the top bar, remembered per browser), animations
 (respecting "reduce motion"), dashboard charts (Chart.js is bundled, no internet needed).
 
+## Channel details
+Open **Channels > Details** on any channel and press **Fetch details**. It shows, from public YouTube data:
+subscribers, total views, number of videos, a bar chart of the recent videos' views, top videos, latest uploads
+(date, views, likes, comments, length), upload rhythm, engagement and a short **AI summary** of what the content is about.
+The details cost about 3 YouTube quota units per refresh and are stored, so opening the page uses no quota.
+**Watch time, revenue and audience data are not public** (only the channel owner sees them in YouTube Analytics), so
+they are shown as "Not available" and never guessed.
+
 ## Updating an existing project
 1. Stop the server. Copy this zip's contents over your old project folder. **Keep your own `.env` and `db.sqlite3`.**
 2. `pip install -r requirements.txt`
@@ -206,7 +214,7 @@ python manage.py test
 ```
 Covers calculations, workflow, observations, monitoring, reports and exports, audit, settings, backups,
 growth estimate, anomaly alerts, portal privacy, PDF/email delivery, 2FA, sessions, AI summary and smart search
-(email, AI and WhatsApp calls are mocked, so tests need no internet or key; 169 tests).
+(email, AI, YouTube and WhatsApp calls are mocked, so tests need no internet or key; 188 tests).
 
 ## Project layout
 ```
@@ -261,3 +269,23 @@ Notes
 3. Set `ADMIN_URL` to a private path; consider `REQUIRE_2FA=True`.
 4. Configure SMTP; the scheduled jobs (`run_checks`, `send_client_reports`, `backup_db`, `prune_old_data`) are installed by the script.
 5. Rotate any key that was exposed. Test a backup restore with `backup_db --verify`.
+
+## Link auto-fill, Google channel list, baseline auto-fill
+
+- **Add Channel**: paste a YouTube link (`@handle`, `/channel/UC...`, video, youtu.be or shorts). Channel name, Channel ID and subscribers are filled from YouTube ("Fetch from YouTube" button, also automatic on save).
+- **Google Account detail**: lists the channels of the connected account (name, subscribers, videos, views). Managers can pick a customer and click **Import as Channel**. `mine=true` returns only the channel chosen at consent; for other brand channels, reconnect and pick that channel in Google's chooser, or use the public link lookup.
+- **New Order**: choosing a channel fills Baseline from the current YouTube count, warns if the typed value differs by more than 10%, and offers "Use X as baseline". Public counts above 1000 are rounded (Approximate).
+- Watch time, revenue and audience need the YouTube Analytics API with owner OAuth (`yt-analytics.readonly`); not included.
+- UI: mobile topbar no longer overflows; order action buttons are aligned.
+- Tests: 214.
+
+## Owner Analytics (watch time, exact subscribers)
+
+- Scope `yt-analytics.readonly` is now requested. Accounts connected earlier show "Analytics permission missing": press Reauthorize once.
+- Channel Details > "Refresh Analytics" (channel must be linked to a connected account, e.g. via Import as Channel): watch time, views, average view duration and **exact** net subscriber change for the last 28 days and since the latest order baseline.
+- Analytics is not real-time: the report ends 3 days ago. Revenue is not included.
+- In Google Cloud, enable the **YouTube Analytics API** and add the scope to the consent screen.
+
+## Brand channels (one Google login, many channels)
+
+Each connection is now identified by Google user + chosen YouTube channel. To add another brand channel of the same login: Google Accounts > Connect, use the same email and pick the other channel in Google's chooser. It appears as a separate connection (label defaults to the channel name). Reconnecting the same channel updates the existing connection; older records are adopted automatically. Reauthorizing must use the same channel.

@@ -53,9 +53,10 @@ class GoogleBaseTest(TestCase):
         self.operator = User.objects.create_user("op1", password="pass12345", role="operator")
         self.sales = User.objects.create_user("sales1", password="pass12345", role="sales")
 
-    def connect(self, tokens=None, info=None, pending=None):
+    def connect(self, tokens=None, info=None, pending=None, channels=()):
         with patch("googleaccounts.oauth.exchange_code", return_value=tokens or GOOD_TOKENS), \
-             patch("googleaccounts.oauth.fetch_userinfo", return_value=info or GOOD_INFO):
+             patch("googleaccounts.oauth.fetch_userinfo", return_value=info or GOOD_INFO), \
+             patch("ytchannels.resolver.fetch_mine", return_value=list(channels)):
             return services.complete_connection("code", pending or {"label": "Ali main"}, self.manager)
 
 

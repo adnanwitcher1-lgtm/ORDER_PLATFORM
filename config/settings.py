@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.1/ref/settings/
 """
 
+import sys
 from pathlib import Path
 from decouple import config
 from decouple import Csv, config
@@ -150,6 +151,8 @@ LOGIN_URL = "accounts:login"
 LOGIN_REDIRECT_URL = "core:dashboard"
 LOGOUT_REDIRECT_URL = "accounts:login"
 YOUTUBE_API_KEY = config("YOUTUBE_API_KEY", default="")
+# Channel form reads the name/ID/subscribers from YouTube automatically (switched off while running tests).
+AUTO_LOOKUP = config("AUTO_LOOKUP", default=True, cast=bool) and "test" not in sys.argv
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 GOOGLE_OAUTH_CLIENT_ID = config("GOOGLE_OAUTH_CLIENT_ID", default="")
 GOOGLE_OAUTH_CLIENT_SECRET = config("GOOGLE_OAUTH_CLIENT_SECRET", default="")

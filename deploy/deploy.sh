@@ -24,7 +24,11 @@ git config --global --add safe.directory /srv/order_platform
 echo "==> Installing system packages"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -y
-apt-get install -y python3 python3-venv python3-pip git nginx postgresql postgresql-contrib libpq-dev cron curl
+apt-get install -y python3 python3-venv python3-pip git nginx libpq-dev cron curl
+# Only install PostgreSQL if the server has none (an existing server is reused and left untouched).
+if ! command -v pg_lsclusters >/dev/null 2>&1 || [ -z "$(pg_lsclusters -h 2>/dev/null)" ]; then
+  apt-get install -y postgresql postgresql-contrib
+fi
 
 echo "==> App user and code"
 id "$APP_USER" >/dev/null 2>&1 || useradd --system --create-home --shell /bin/bash "$APP_USER"
@@ -41,6 +45,7 @@ if [ ! -f "$APP_DIR/.env" ]; then
   cp "$ENV_SOURCE" "$APP_DIR/.env"
 fi
 chmod 600 "$APP_DIR/.env"
+chown "$APP_USER":"$APP_USER" "$APP_DIR/.env"
 
 set_env() {  # set_env KEY VALUE  (adds or replaces KEY in .env)
   python3 - "$APP_DIR/.env" "$1" "$2" <<'PY'
@@ -79,15 +84,23 @@ set_env TRUST_PROXY_HEADERS True
 set_env DB_NAME "$DB_NAME"
 set_env DB_USER "$DB_USER"
 set_env DB_HOST 127.0.0.1
-set_env DB_PORT 5432
 set_env BACKUP_DIR "$APP_DIR/backups"
 
 echo "==> PostgreSQL database"
-sudo -u postgres psql -tc "SELECT 1 FROM pg_roles WHERE rolname='$DB_USER'" | grep -q 1 \
-  || sudo -u postgres psql -c "CREATE ROLE $DB_USER LOGIN PASSWORD '$DB_PASSWORD'"
-sudo -u postgres psql -c "ALTER ROLE $DB_USER PASSWORD '$DB_PASSWORD'"
-sudo -u postgres psql -tc "SELECT 1 FROM pg_database WHERE datname='$DB_NAME'" | grep -q 1 \
-  || sudo -u postgres createdb -O "$DB_USER" "$DB_NAME"
+# Use the cluster that is already running on port 5432 (else the first online cluster).
+PG_PORT=5432
+pg_lsclusters -h | awk '$3==5432 && $4=="online"' | grep -q . \
+  || PG_PORT="$(pg_lsclusters -h | awk '$4=="online"{print $3; exit}')"
+[ -n "$PG_PORT" ] || { echo "No running PostgreSQL cluster found."; exit 1; }
+echo "Using PostgreSQL on port $PG_PORT"
+PSQL="sudo -u postgres psql -p $PG_PORT"
+$PSQL -tc "SELECT 1 FROM pg_roles WHERE rolname='$DB_USER'" | grep -q 1 \
+  || $PSQL -c "CREATE ROLE $DB_USER LOGIN PASSWORD '$DB_PASSWORD'"
+$PSQL -c "ALTER ROLE $DB_USER PASSWORD '$DB_PASSWORD'"
+$PSQL -tc "SELECT 1 FROM pg_database WHERE datname='$DB_NAME'" | grep -q 1 \
+  || sudo -u postgres createdb -p "$PG_PORT" -O "$DB_USER" "$DB_NAME"
+set_env DB_PORT "$PG_PORT"
+chown "$APP_USER":"$APP_USER" "$APP_DIR/.env"
 
 echo "==> Python environment"
 sudo -u "$APP_USER" bash -c "cd $APP_DIR && python3 -m venv venv && venv/bin/pip install -q --upgrade pip && venv/bin/pip install -q -r requirements.txt"

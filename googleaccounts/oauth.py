@@ -10,11 +10,16 @@ REVOKE_URL = "https://oauth2.googleapis.com/revoke"
 USERINFO_URL = "https://openidconnect.googleapis.com/v1/userinfo"
 
 YOUTUBE_SCOPE = "https://www.googleapis.com/auth/youtube.readonly"
-SCOPES = ["openid", "email", YOUTUBE_SCOPE]
+ANALYTICS_SCOPE = "https://www.googleapis.com/auth/yt-analytics.readonly"
+SCOPES = ["openid", "email", YOUTUBE_SCOPE, ANALYTICS_SCOPE]
 
 
 class OAuthError(Exception):
     """Error that is safe to show to the user. It never contains secrets."""
+
+
+class NeedsReauth(OAuthError):
+    """The refresh token is no longer valid (revoked or expired)."""
 
 
 @dataclass(frozen=True)
@@ -106,3 +111,28 @@ def revoke_token(token):
     except requests.RequestException:
         return False
     return response.status_code == 200
+
+
+def refresh_access_token(refresh_token):
+    """A short-lived access token for read-only YouTube calls."""
+    try:
+        response = requests.post(TOKEN_URL, data={
+            "refresh_token": refresh_token,
+            "client_id": settings.GOOGLE_OAUTH_CLIENT_ID,
+            "client_secret": settings.GOOGLE_OAUTH_CLIENT_SECRET,
+            "grant_type": "refresh_token",
+        }, timeout=10)
+    except requests.RequestException:
+        raise OAuthError("Network error: could not reach Google.")
+    if response.status_code == 200:
+        token = response.json().get("access_token", "")
+        if token:
+            return token
+        raise OAuthError("Google did not return an access token.")
+    try:
+        error = response.json().get("error", "")
+    except ValueError:
+        error = ""
+    if error == "invalid_grant":
+        raise NeedsReauth("Authorization has expired or been revoked.")
+    raise OAuthError(f"Google error (HTTP {response.status_code}).")

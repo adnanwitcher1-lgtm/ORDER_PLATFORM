@@ -208,6 +208,7 @@
         </form>
         {% endif %}
     </div>
+    {% if can_record or order.latest_observed_accuracy == "approximate" %}
     <div class="card-body">
         {% if can_record %}
         <form method="post" action="{% url 'orders:observation_create' order.pk %}" class="obs-form">
@@ -222,6 +223,7 @@
             <small class="muted">The latest count is approximate (the YouTube public count is rounded). Verify the source before completing.</small>
         {% endif %}
     </div>
+    {% endif %}
     <div class="table-wrap">
         <table class="table">
             <thead><tr><th>When</th><th>Count</th><th>Type</th><th>Source</th><th>By</th><th>Note / Status</th></tr></thead>

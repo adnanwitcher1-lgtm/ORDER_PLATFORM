@@ -33,11 +33,12 @@
             <tbody>
                 {% for ch in page_obj %}
                 <tr>
-                    <td><strong>{{ ch.name }}</strong></td>
+                    <td><a href="{% url 'channels:detail' ch.pk %}" class="link"><strong>{{ ch.name }}</strong></a></td>
                     <td><a href="{% url 'customers:detail' ch.customer.pk %}" class="link">{{ ch.customer.name }}</a></td>
                     <td><a href="{{ ch.url }}" target="_blank" rel="noopener noreferrer" class="link">{{ ch.url|truncatechars:45 }}</a></td>
                     <td><span class="badge badge-{{ ch.status }}">{{ ch.get_status_display }}</span></td>
                     <td class="actions">
+                        <a href="{% url 'channels:detail' ch.pk %}" class="btn btn-light btn-sm">Details</a>
                         {% if can_edit %}
                             <a href="{% url 'channels:update' ch.pk %}" class="btn btn-primary btn-sm">Edit</a>
                             <form method="post" action="{% url 'channels:archive' ch.pk %}"
